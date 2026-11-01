@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Книга записи</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#1C1E21;--island:#292B2E;--island2:#2F3134;--acc:#EDC728;--text:#fff;--text2:#8D8D8D;--div:#3A3D40;--ok:#28ED4C;--okbg:#294833;--bad:#ff6b6b}
+*{font-family:'Onest',system-ui,sans-serif;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);margin:0;padding:16px;letter-spacing:-.02em}
+.wrap{max-width:560px;margin:0 auto}
+h1{font-size:26px;margin:0 0 16px}
+h2{font-size:20px;margin:24px 0 12px}
+.card{background:var(--island);border-radius:16px;padding:20px;margin-bottom:16px}
+.input{width:100%;background:var(--island2);border:1px solid var(--div);border-radius:8px;padding:12px 16px;color:var(--text);font-size:16px}
+.input:focus{outline:none;border-color:var(--text2)}
+label{display:block;font-size:14px;color:var(--text2);margin:12px 0 6px}
+.btn{width:100%;background:var(--acc);color:var(--bg);font-weight:600;font-size:15px;border:none;border-radius:10px;padding:14px;cursor:pointer}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-s{width:auto;padding:8px 14px;font-size:13px;border-radius:8px;background:var(--island2);color:var(--text)}
+.btn-d{background:transparent;border:1px solid var(--div);color:var(--bad);padding:6px 12px;border-radius:8px;font-size:13px;cursor:pointer}
+.hidden{display:none!important}
+.cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal-dow{text-align:center;font-size:12px;color:var(--text2);padding:4px 0}
+.cal-day{aspect-ratio:1;border-radius:10px;border:1px solid var(--div);background:var(--island2);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:14px;cursor:pointer;gap:2px}
+.cal-day small{font-size:10px;color:var(--text2)}
+.cal-day.last{border-color:var(--acc)}
+.cal-day.last small{color:var(--acc)}
+.cal-day.sel{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+.cal-day.sel small{color:var(--bg)}
+.cal-day.off,.cal-day.full,.cal-day.past{opacity:.3;pointer-events:none}
+.total-line{display:flex;justify-content:space-between;font-size:14px;color:var(--text2);padding:4px 0}
+.total-line.big{font-size:18px;font-weight:600;color:var(--text);border-top:1px solid var(--div);margin-top:8px;padding-top:10px}
+.total-line.big span:last-child{color:var(--acc)}
+.status{font-size:14px;margin-top:12px;text-align:center}
+.status.err{color:var(--bad)}.status.okc{color:var(--ok)}
+.order-row{background:var(--island2);border-radius:12px;padding:12px;margin-bottom:10px;font-size:14px}
+.order-row .mut{color:var(--text2);font-size:12px}
+.badge{display:inline-block;font-size:11px;padding:3px 8px;border-radius:6px;background:var(--island2);color:var(--text2)}
+.badge.new{background:var(--okbg);color:var(--ok)}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--island2);border:1px solid var(--div);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;margin:0 6px 6px 0}
+.chip.on{border-color:var(--acc);color:var(--acc)}
+a{color:var(--acc)}
+.prod-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:640px){.prod-grid{grid-template-columns:repeat(3,1fr)}}
+.prod-card{background:var(--island2);border:1px solid var(--div);border-radius:12px;padding:10px;cursor:pointer;transition:border-color .2s}
+.prod-card:hover{border-color:var(--acc)}
+.prod-card img{width:100%;height:110px;object-fit:cover;border-radius:8px}
+.prod-emoji{width:100%;height:110px;display:flex;align-items:center;justify-content:center;font-size:44px;background:var(--island);border-radius:8px}
+.prod-name{font-size:14px;font-weight:600;margin-top:8px}
+.prod-cat{font-size:12px;color:var(--text2)}
+.prod-price{font-size:13px;color:var(--acc);margin-top:4px}
+/* === Дизайн-токены: меняются здесь, применяются везде === */
+:root{
+--hover:#404347;
+--hover-2:#4a4d52;
+--acc-hover:#d6b314;
+--chip-bg:var(--island-2);
+--chip-bg-hover:var(--hover);
+--chip-active-bg:#FFFFFF;
+--chip-active-text:#363636;
+--tag-bg:var(--hover);
+--tag-text:var(--text);
+--tag-del:var(--text-2);
+--tag-del-hover:#ff6b6b;
+--card-pad:25px;
+--card-radius:16px;
+--head-line:var(--div);
+}
+.card{padding:var(--card-pad);border-radius:var(--card-radius)}
+.card h2{font-size:20px;font-weight:600;letter-spacing:-.02em;margin:0 0 14px;padding-bottom:12px;border-bottom:1px solid var(--head-line)}
+/* Чипсы-переключатели (категории, дни недели, опции): default / hover / active */
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--chip-bg);color:var(--text-2);border:none;border-radius:8px;padding:8px 20px;font-size:14px;cursor:pointer;transition:background .2s,color .2s}
+.chip:hover{background:var(--chip-bg-hover);color:var(--text)}
+.chip.on{background:var(--chip-active-bg);color:var(--chip-active-text);font-weight:600}
+.chip.on:hover{background:var(--chip-active-bg)}
+/* Теги с удалением (как tag-chip в v023) */
+.tag-chip{display:inline-flex;align-items:center;gap:8px;background:var(--tag-bg);color:var(--tag-text);border:none;border-radius:8px;padding:6px 12px;font-size:14px}
+.tag-chip button{background:none;border:none;color:var(--tag-del);font-size:12px;line-height:1;cursor:pointer;padding:0}
+.tag-chip button:hover{color:var(--tag-del-hover)}
+/* Кнопки */
+.btn{background:var(--acc);color:var(--bg);font-weight:600;font-size:14px;border:none;border-radius:8px;padding:12px 16px;cursor:pointer;transition:background .2s}
+.btn:hover{background:var(--acc-hover)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-s{background:var(--hover);color:var(--text);border:none;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s}
+.btn-s:hover{background:var(--hover-2)}
+.btn-s:disabled{opacity:.3;cursor:not-allowed}
+.btn-d{background:transparent;border:1px solid var(--div);color:var(--tag-del-hover);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;transition:background .2s}
+.btn-d:hover{background:var(--hover)}
+/* Витрина: 2 карточки в ряд, минимум содержания */
+.prod-grid{display:grid;grid-template-columns:1fr;gap:16px}
+@media(min-width:640px){.prod-grid{grid-template-columns:repeat(2,1fr)}}
+.prod-card{background:var(--island-2);border:1px solid var(--div);border-radius:var(--card-radius);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;padding:0;transition:border-color .2s}
+.prod-card:hover{border-color:var(--text-2)}
+.prod-card img,.prod-emoji{width:100%;height:200px;object-fit:cover;background:var(--island)}
+.prod-emoji{display:flex;align-items:center;justify-content:center;font-size:56px}
+.prod-body{padding:20px;display:flex;flex-direction:column;flex:1}
+.prod-name{font-size:20px;font-weight:600;letter-spacing:-.02em}
+.prod-price{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px}
+.prod-price b{font-size:18px;font-weight:600;color:var(--acc)}
+.prod-price span{font-size:14px;color:var(--text-2)}
+/* Попап изделия */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
+.modal-content{background:var(--island);border-radius:var(--card-radius);max-width:440px;width:100%;max-height:90vh;overflow-y:auto;position:relative;color:var(--text)}
+/* Списки тегов в админке */
+#aCatList{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+/* Таблица изделий */
+.adm-head{display:none;font-size:12px;color:var(--text-2)}
+@media(min-width:768px){.adm-head{display:grid}}
+.adm-head,.adm-row{grid-template-columns:56px 1fr 110px 90px 100px 84px 40px;gap:8px;align-items:center}
+.adm-head{padding:0 12px 8px;border-bottom:1px solid var(--head-line)}
+.adm-row{padding:12px;border-bottom:1px solid var(--div);cursor:pointer;border-radius:12px}
+.adm-row:hover{background:var(--hover)}
+.adm-row:last-child{border-bottom:none}
+@media(max-width:767px){
+.adm-head,.adm-row{grid-template-columns:48px 1fr 90px 40px}
+.adm-head>:nth-child(3),.adm-row>:nth-child(3),.adm-head>:nth-child(5),.adm-row>:nth-child(5),.adm-head>:nth-child(6),.adm-row>:nth-child(6){display:none}
+}
+.adm-thumb{width:40px;height:40px;border-radius:8px;background:var(--island);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:18px}
+.adm-thumb img{width:100%;height:100%;object-fit:cover}
+#adminTabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<!-- КЛИЕНТ -->
+<main id="clientPage">
+<h1>Книга записи</h1>
+<div class="card">
+<div id="catChips" style="margin-bottom:12px"></div>
+<div id="productGrid" class="prod-grid"></div>
+</div>
+<div class="card hidden" id="orderCard">
+<button class="btn-s" id="backToShop" style="margin-bottom:12px">← к витрине</button>
+<div id="selProductHead" style="display:flex;gap:12px;align-items:flex-start;margin-bottom:14px"></div>
+<h2 style="margin:0 0 10px">Выберите дату</h2>
+<div class="cal-head">
+<button class="btn-s" id="calPrev">←</button>
+<b id="calTitle"></b>
+<button class="btn-s" id="calNext">→</button>
+</div>
+<div class="cal-grid" id="calDows"></div>
+<div class="cal-grid" id="calGrid" style="margin-top:6px"></div>
+<p style="font-size:12px;color:var(--text2);margin:12px 0 0" id="calHint"></p>
+<div id="paramsBox" class="hidden">
+<h2 style="margin:16px 0 10px">Параметры на <span id="selDateTxt"></span></h2>
+<label>Вес: <b id="wLbl"></b></label>
+<input id="fWeight" type="range" step="0.5" style="width:100%">
+<label>Начинка</label><select id="fFilling" class="input"></select>
+<label>Дополнительно</label><div id="fOptions"></div>
+<label>Имя</label><input id="fName" class="input" placeholder="Как к вам обращаться">
+<label>Телефон</label><input id="fPhone" class="input" type="tel" placeholder="+7 (___) ___-__-__">
+<label>Комментарий</label><input id="fComment" class="input" placeholder="Пожелания">
+<div style="margin-top:14px" id="calcBox"></div>
+<button class="btn" id="submitBtn" style="margin-top:14px">Забронировать</button>
+<div class="status" id="orderStatus"></div>
+</div>
+</div>
+</main>
+<!-- ВЛАДЕЛЕЦ -->
+<section id="adminPage" class="hidden">
+<div id="adminLogin" class="card">
+<h2 style="margin-top:0">Вход для владельца</h2>
+<input id="adminPass" type="password" class="input" placeholder="Пароль">
+<button class="btn" style="margin-top:12px" id="loginBtn">Войти</button>
+<div class="status err" id="loginErr"></div>
+</div>
+<div id="adminPanel" class="hidden">
+<h1 style="font-size:26px;margin:0 0 16px">Панель владельца</h1>
+<div id="adminTabs">
+<button class="chip on" data-tab="basic" onclick="switchCakeTab('basic')">Основные настройки</button>
+<button class="chip" data-tab="goods" onclick="switchCakeTab('goods')">Товары</button>
+<button class="chip" data-tab="orders" onclick="switchCakeTab('orders')">Заказы</button>
+</div>
+<div class="card" data-tab="basic">
+<h2>Лимиты и календарь</h2>
+<label>Максимум броней на день (N)</label><input id="sSlots" type="number" class="input" min="1">
+<label>Горизонт записи, дней</label><input id="sHorizon" type="number" class="input" min="1">
+<label>Выходные дни недели</label><div id="sDows"></div>
+<label>Закрытые даты (через запятую, ГГГГ-ММ-ДД)</label><input id="sBlocked" class="input">
+<button class="btn-s" id="saveSettings" style="margin-top:12px">Сохранить настройки</button>
+<div class="status okc" id="setSaved"></div>
+</div>
+<div class="card" data-tab="goods">
+<h2>Категории</h2>
+<div style="display:flex;gap:8px"><input id="aCatNew" class="input" placeholder="Новая категория"><button class="btn-s" id="aCatAdd" style="flex:none">+ Добавить</button></div>
+<div id="aCatList" style="margin-top:10px"></div>
+</div>
+<div class="card" data-tab="goods">
+<h2>Изделия</h2>
+<div id="aProdList"></div>
+<div style="border-top:1px solid var(--div);margin-top:12px;padding-top:12px">
+<b id="aProdFormTitle" style="font-size:14px">Новое изделие</b>
+<label>Название</label><input id="pName" class="input">
+<label>Категория</label><select id="pCat" class="input"></select>
+<label>Ссылка на фото</label><input id="pPhoto" class="input" placeholder="https://...">
+<label>Описание</label><input id="pDesc" class="input">
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+<div><label>Цена, ₽/кг</label><input id="pPrice" type="number" class="input"></div>
+<div><label>Мин. вес, кг</label><input id="pMin" type="number" step="0.5" class="input"></div>
+<div><label>Макс. вес, кг</label><input id="pMax" type="number" step="0.5" class="input"></div>
+</div>
+<div style="display:flex;gap:8px;margin-top:12px"><button class="btn-s" id="pSave">Сохранить изделие</button><button class="btn-s hidden" id="pCancel">Отмена</button></div>
+</div>
+</div>
+<div class="card" data-tab="goods">
+<h2>Начинки</h2>
+<div id="aFillList"></div>
+<div style="border-top:1px solid var(--div);margin-top:12px;padding-top:12px">
+<b id="aFillFormTitle" style="font-size:14px">Новая начинка</b>
+<label>Название</label><input id="flName" class="input">
+<label>Цена, ₽/кг</label><input id="flPrice" type="number" class="input">
+<label>Описание</label><input id="flDesc" class="input">
+<div style="display:flex;gap:8px;margin-top:12px"><button class="btn-s" id="flSave">Сохранить начинку</button><button class="btn-s hidden" id="flCancel">Отмена</button></div>
+</div>
+</div>
+<div class="card" data-tab="goods">
+<h2>Доп. опции</h2>
+<div id="aOptList"></div>
+<div style="border-top:1px solid var(--div);margin-top:12px;padding-top:12px">
+<b id="aOptFormTitle" style="font-size:14px">Новая опция</b>
+<label>Название</label><input id="opName" class="input">
+<label>Цена, ₽ (фикс)</label><input id="opPrice" type="number" class="input">
+<div style="display:flex;gap:8px;margin-top:12px"><button class="btn-s" id="opSave">Сохранить опцию</button><button class="btn-s hidden" id="opCancel">Отмена</button></div>
+</div>
+</div>
+<div class="card" data-tab="orders">
+<h2>Заказы</h2>
+<div id="ordersBox"></div>
+</div>
+<p style="text-align:center"><a href="#" id="exitAdmin">← На сайт</a></p>
+</div>
+</section>
+</div>
+<!-- ПОПАП ИЗДЕЛИЯ -->
+<div id="productModal" class="modal-overlay hidden" onclick="if(event.target===this)closeProductModal()">
+<div class="modal-content">
+<button class="btn-s" onclick="closeProductModal()" style="position:absolute;top:12px;right:12px;z-index:1">✕</button>
+<div id="pmPhoto"></div>
+<div style="padding:20px">
+<div class="prod-name" id="pmName"></div>
+<div style="color:var(--text-2);margin:4px 0 12px" id="pmCat"></div>
+<p style="font-size:14px;color:var(--text-2);margin:0 0 16px" id="pmDesc"></p>
+<div class="prod-price" style="margin:0 0 16px"><b id="pmPrice"></b><span id="pmMin"></span></div>
+<button class="btn" style="width:100%" id="pmBtn">Выбрать дату</button>
+</div>
+</div>
+</div>
+<script>
+/* ========== CORE: константы и состояние ========== */
+const SUPABASE_URL = "https://jmbmdzguyjmopwdgmwfp.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_0JL2_MLeoxjpC7wCSTtwgA_VAHNjm2J";
+const SITE_ID = "cakes-demo";
+const sb = window.supabase ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const fmt = n => n.toLocaleString("ru-RU") + " ₽";
+const iso = d => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+const DOW = ["вс","пн","вт","ср","чт","пт","сб"];
+const MONTHS = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+const DEFAULT_CONFIG = {
+  slotsPerDay: 3, horizonDays: 30, weekdaysOff: [1], blockedDates: [], ownerIds: [],
+  categories: ["Торты","Капкейки","Десерты"],
+  products: [
+    {name:"Медовик классический", category:"Торты", pricePerKg:1400, minWeight:1, maxWeight:5, description:"Классика с кремом из сметаны"},
+    {name:"Бенто-торт", category:"Торты", pricePerKg:1800, minWeight:1, maxWeight:2, description:"Мини-торт с надписью"},
+    {name:"Капкейки ванильные", category:"Капкейки", pricePerKg:1600, minWeight:0.5, maxWeight:3, description:"Шапочка из крем-чиза"},
+    {name:"Тарт с ягодами", category:"Десерты", pricePerKg:2000, minWeight:0.5, maxWeight:2, description:"Песочная основа, заварной крем"}
+  ],
+  fillings: [
+    {name:"Вишня-шоколад", pricePerKg:400, description:"Вишня, ганаш"},
+    {name:"Карамель-банан", pricePerKg:350, description:"Карамель, банан, крем-чиз"},
+    {name:"Клубника-сливки", pricePerKg:450, description:"Клубника, взбитые сливки"}
+  ],
+  options: [
+    {name:"Надпись", price:300},
+    {name:"Топпер", price:500},
+    {name:"Праздничная коробка", price:350}
+  ],
+  telegramConfigured: false
+};
+let CONFIG = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+let sessionPass = null;
+let counts = {};          // "ГГГГ-ММ-ДД" -> число активных броней
+let viewY, viewM;         // отображаемый месяц
+let selDate = null;       // выбранная дата
+/* ========== CORE: конфиг ========== */
+async function loadConfig(){
+  if (sb) { try {
+    const {data, error} = await sb.rpc("get_public_config", {p_site_id: SITE_ID});
+    if (!error && data) return Object.assign(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), data);
+  } catch(e){} }
+  return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+}
+async function saveConfig(){
+  if (!sb || !sessionPass) return false;
+  const {data, error} = await sb.rpc("update_site_config", {p_site_id: SITE_ID, p_data: CONFIG, p_pass: sessionPass});
+  return !error && data === true;
+}
+/* ========== CORE: слоты и состояния дня ========== */
+async function loadCounts(){
+  if (!sb) return;
+  const from = new Date(viewY, viewM, 1), to = new Date(viewY, viewM+1, 0);
+  const {data} = await sb.rpc("get_day_counts", {p_site_id: SITE_ID, p_from: iso(from), p_to: iso(to)});
+  counts = {};
+  (data || []).forEach(r => counts[r.day] = r.cnt);
+}
+function dayState(dateStr){
+  const d = new Date(dateStr + "T00:00:00");
+  const today = new Date(); today.setHours(0,0,0,0);
+  const horizon = new Date(today); horizon.setDate(horizon.getDate() + (CONFIG.horizonDays || 30));
+  if (d < today) return "past";
+  if (d > horizon) return "past";
+  if ((CONFIG.blockedDates || []).includes(dateStr)) return "off";
+  if ((CONFIG.weekdaysOff || []).includes(d.getDay())) return "off";
+  const c = counts[dateStr] || 0, n = CONFIG.slotsPerDay || 3;
+  if (c >= n) return "full";
+  if (c === n - 1) return "last";
+  return "free";
+}
+
+/* ========== FEATURE: календарь ========== */
+function renderCalendar(){
+  document.getElementById("calTitle").textContent = MONTHS[viewM] + " " + viewY;
+  document.getElementById("calDows").innerHTML = [1,2,3,4,5,6,0].map(i => `<div class="cal-dow">${DOW[i]}</div>`).join("");
+  const grid = document.getElementById("calGrid"); grid.innerHTML = "";
+  const shift = (new Date(viewY, viewM, 1).getDay() + 6) % 7;
+  for (let i = 0; i < shift; i++) grid.appendChild(document.createElement("div"));
+  const days = new Date(viewY, viewM + 1, 0).getDate();
+  for (let d = 1; d <= days; d++) {
+    const ds = iso(new Date(viewY, viewM, d));
+    const st = dayState(ds);
+    const el = document.createElement("div");
+    el.className = "cal-day " + st + (selDate === ds ? " sel" : "");
+    const free = (CONFIG.slotsPerDay || 3) - (counts[ds] || 0);
+    el.innerHTML = `<span>${d}</span>` + (st === "free" || st === "last" ? `<small>${free} окн.</small>` : st === "full" ? `<small>занято</small>` : st === "off" ? `<small>выход</small>` : "");
+    el.onclick = () => { selDate = ds; renderCalendar(); showParams(); };
+    grid.appendChild(el);
+  }
+  const today = new Date();
+  document.getElementById("calPrev").disabled = (viewY === today.getFullYear() && viewM === today.getMonth());
+  const hor = new Date(); hor.setDate(hor.getDate() + (CONFIG.horizonDays || 30));
+  document.getElementById("calNext").disabled = (viewY === hor.getFullYear() && viewM === hor.getMonth());
+  document.getElementById("calHint").textContent = "Окон на день: " + CONFIG.slotsPerDay + ". Запись открыта на " + CONFIG.horizonDays + " дней вперёд.";
+}
+document.getElementById("calPrev").onclick = () => { viewM--; if (viewM < 0){viewM = 11; viewY--;} loadCounts().then(renderCalendar); };
+document.getElementById("calNext").onclick = () => { viewM++; if (viewM > 11){viewM = 0; viewY++;} loadCounts().then(renderCalendar); };
+/* ========== FEATURE: витрина ========== */
+let currentCat = null;
+let selProduct = null;
+function renderShop(){
+  const chips = document.getElementById("catChips");
+  const cats = (CONFIG.categories || []).filter(c => (CONFIG.products || []).some(p => p.category === c));
+  if (currentCat && !cats.includes(currentCat)) currentCat = null;
+  chips.innerHTML = "";
+  const mk = (label, val) => {
+    const b = document.createElement("button");
+    b.className = "chip" + (currentCat === val ? " on" : "");
+    b.textContent = label;
+    b.onclick = () => { currentCat = val; renderShop(); };
+    chips.appendChild(b);
+  };
+  mk("Все", null);
+  cats.forEach(c => mk(c, c));
+  const grid = document.getElementById("productGrid"); grid.innerHTML = "";
+  (CONFIG.products || []).forEach((p, i) => {
+    if (currentCat && p.category !== currentCat) return;
+    const card = document.createElement("div");
+    card.className = "prod-card";
+    card.innerHTML = (p.photo ? `<img src="${esc(p.photo)}" alt="${esc(p.name)}">` : `<div class="prod-emoji">🍰</div>`) +
+      `<div class="prod-body">
+        <div class="prod-name">${esc(p.name)}</div>
+        <div class="prod-price"><b>${fmt(p.pricePerKg)}/кг</b><span>вес от ${p.minWeight} кг</span></div>
+      </div>`;
+    card.onclick = () => openProductModal(i);
+    grid.appendChild(card);
+  });
+  if (!(CONFIG.products || []).length) grid.innerHTML = `<p style="color:var(--text2);font-size:14px">Витрина пуста. Заполните её в панели владельца: #admin</p>`;
+}
+function openOrderFor(i){
+  selProduct = i; selDate = null;
+  const p = CONFIG.products[i];
+  document.getElementById("orderCard").classList.remove("hidden");
+  document.getElementById("paramsBox").classList.add("hidden");
+  document.getElementById("selProductHead").innerHTML =
+    (p.photo ? `<img src="${esc(p.photo)}" style="width:56px;height:56px;border-radius:10px;object-fit:cover;flex:none">` : `<div style="font-size:32px">🍰</div>`) +
+    `<div><b>${esc(p.name)}</b><div style="font-size:13px;color:var(--text2);margin:2px 0">${esc(p.description || "")}</div><div style="font-size:13px;color:var(--acc)">${fmt(p.pricePerKg)}/кг · мин. ${p.minWeight} кг</div></div>`;
+  const now = new Date(); viewY = now.getFullYear(); viewM = now.getMonth();
+  loadCounts().then(renderCalendar);
+  document.getElementById("orderCard").scrollIntoView({behavior:"smooth"});
+}
+document.getElementById("backToShop").onclick = () => {
+  document.getElementById("orderCard").classList.add("hidden");
+  selProduct = null; selDate = null;
+};
+let pmIndex = null;
+function openProductModal(i){
+  pmIndex = i;
+  const p = CONFIG.products[i];
+  document.getElementById("pmPhoto").innerHTML = p.photo
+    ? `<img src="${esc(p.photo)}" style="width:100%;height:220px;object-fit:cover;display:block" alt="">`
+    : `<div class="prod-emoji" style="height:220px">🍰</div>`;
+  document.getElementById("pmName").textContent = p.name;
+  document.getElementById("pmCat").textContent = p.category || "";
+  document.getElementById("pmDesc").textContent = p.description || "";
+  document.getElementById("pmPrice").textContent = fmt(p.pricePerKg) + "/кг";
+  document.getElementById("pmMin").textContent = "вес от " + p.minWeight + " кг";
+  document.getElementById("productModal").classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+function closeProductModal(){
+  document.getElementById("productModal").classList.add("hidden");
+  document.body.style.overflow = "";
+  pmIndex = null;
+}
+document.getElementById("pmBtn").onclick = () => {
+  const i = pmIndex;
+  closeProductModal();
+  if (i !== null) openOrderFor(i);
+};
+function showParams(){
+  document.getElementById("selDateTxt").textContent = selDate.split("-").reverse().join(".");
+  document.getElementById("paramsBox").classList.remove("hidden");
+  const p = CONFIG.products[selProduct];
+  const w = document.getElementById("fWeight");
+  w.min = p.minWeight; w.max = p.maxWeight; w.value = p.minWeight;
+  document.getElementById("fFilling").innerHTML = (CONFIG.fillings || []).map((f, i) => `<option value="${i}">${esc(f.name)} (+${fmt(f.pricePerKg)}/кг)</option>`).join("");
+  document.getElementById("fOptions").innerHTML = (CONFIG.options || []).map((o, i) => `<label class="chip" data-i="${i}"><input type="checkbox" style="accent-color:var(--acc)"> ${esc(o.name)} +${fmt(o.price)}</label>`).join("");
+  recalc();
+}
+function recalc(){
+  if (selProduct === null) return;
+  const p = CONFIG.products[selProduct];
+  const f = CONFIG.fillings[+document.getElementById("fFilling").value] || CONFIG.fillings[0];
+  const w = +document.getElementById("fWeight").value;
+  document.getElementById("wLbl").textContent = w + " кг";
+  let optsSum = 0, optsHtml = "";
+  document.querySelectorAll("#fOptions .chip").forEach(ch => {
+    const i = +ch.dataset.i, on = ch.querySelector("input").checked;
+    ch.classList.toggle("on", on);
+    if (on) { optsSum += CONFIG.options[i].price; optsHtml += `<div class="total-line"><span>${esc(CONFIG.options[i].name)}</span><span>${fmt(CONFIG.options[i].price)}</span></div>`; }
+  });
+  document.getElementById("calcBox").innerHTML =
+    `<div class="total-line"><span>${esc(p.name)} (${fmt(p.pricePerKg)}/кг × ${w} кг)</span><span>${fmt(p.pricePerKg * w)}</span></div>` +
+    `<div class="total-line"><span>${esc(f.name)} (${fmt(f.pricePerKg)}/кг × ${w} кг)</span><span>${fmt(f.pricePerKg * w)}</span></div>` +
+    optsHtml +
+    `<div class="total-line big"><span>Итого (предварительно)</span><span>${fmt((p.pricePerKg + f.pricePerKg) * w + optsSum)}</span></div>`;
+}
+["fFilling","fWeight"].forEach(id => document.getElementById(id).addEventListener("input", recalc));
+document.getElementById("fOptions").addEventListener("change", recalc);
+/* маска телефона */
+function formatPhone(v){const d=v.replace(/\D/g,"");let r="+7";if(d.length>1)r+=" ("+d.substring(1,4);if(d.length>=4)r+=") "+d.substring(4,7);if(d.length>=7)r+="-"+d.substring(7,9);if(d.length>=9)r+="-"+d.substring(9,11);return r;}
+document.getElementById("fPhone").addEventListener("input", e => {
+  let v = e.target.value; if (!v || v === "+") { e.target.value = v ? "+7" : ""; return; }
+  let d = v.replace(/\D/g,""); if (!d) { e.target.value = ""; return; }
+  if (d[0]==="8") d = "7"+d.substring(1); if (d[0]!=="7") d = "7"+d;
+  e.target.value = formatPhone(d);
+});
+/* отправка брони */
+let lastSubmit = 0;
+document.getElementById("submitBtn").onclick = async () => {
+  const st = document.getElementById("orderStatus"); st.className = "status"; st.textContent = "";
+  const name = document.getElementById("fName").value.trim();
+  const phone = document.getElementById("fPhone").value.trim();
+  if (selProduct === null) { st.className="status err"; st.textContent="Выберите изделие на витрине"; return; }
+  if (!selDate) { st.className="status err"; st.textContent="Выберите дату в календаре"; return; }
+  if (!name) { st.className="status err"; st.textContent="Укажите имя"; return; }
+  if (phone.replace(/\D/g,"").length < 11) { st.className="status err"; st.textContent="Укажите телефон полностью"; return; }
+  if (Date.now() - lastSubmit < 60000) { st.className="status err"; st.textContent="Повторная отправка через минуту"; return; }
+  const stDay = dayState(selDate);
+  if (stDay === "full" || stDay === "off" || stDay === "past") {
+    st.className="status err"; st.textContent="День недоступен, выберите другую дату"; return;
+  }
+  lastSubmit = Date.now();
+  const p = CONFIG.products[selProduct], f = curFillingForSubmit(), w = +document.getElementById("fWeight").value;
+  const opts = [...document.querySelectorAll("#fOptions .chip")].filter(ch=>ch.querySelector("input").checked).map(ch=>CONFIG.options[+ch.dataset.i].name);
+  const total = (p.pricePerKg + f.pricePerKg) * w + opts.reduce((s,n)=>s+(CONFIG.options.find(o=>o.name===n)||{price:0}).price,0);
+  const btn = document.getElementById("submitBtn"); btn.disabled = true; st.textContent = "Бронируем...";
+  const {data: rid, error} = await sb.rpc("create_booking", {
+    p_site_id: SITE_ID, p_day: selDate, p_product_name: p.name, p_weight: w,
+    p_filling_name: f.name, p_options: opts, p_total: total,
+    p_client_name: name, p_client_phone: phone, p_comment: document.getElementById("fComment").value.trim()
+  });
+  btn.disabled = false;
+  if (error) { st.className="status err"; st.textContent="Ошибка связи: "+error.message; return; }
+  if (rid === -1) { st.className="status err"; st.textContent="Слишком много заявок с этого номера, подождите"; return; }
+  if (rid === -2) {
+    await loadCounts(); renderCalendar();
+    st.className="status err"; st.textContent="Окно только что заняли или день закрыт — выберите другую дату";
+    return;
+  }
+  if (CONFIG.telegramConfigured && sb) {
+    sb.rpc("send_telegram_message", {p_site_id: SITE_ID, p_text:
+      "🎂 НОВАЯ БРОНЬ\nДата: " + selDate.split("-").reverse().join(".") +
+      "\nИзделие: " + p.name + ", " + w + " кг\nНачинка: " + f.name +
+      (opts.length ? "\nОпции: " + opts.join(", ") : "") +
+      "\nИтого: " + fmt(total) + "\nКлиент: " + name + ", " + phone +
+      (document.getElementById("fComment").value.trim() ? "\nКомментарий: " + document.getElementById("fComment").value.trim() : "")
+    }).catch(()=>{});
+  }
+  await loadCounts(); selDate = null; renderCalendar();
+  document.getElementById("paramsBox").classList.add("hidden");
+  st.className = "status okc"; st.textContent = "Бронь отправлена! Кондитер подтвердит её в ближайшее время.";
+};
+function curFillingForSubmit(){ return CONFIG.fillings[+document.getElementById("fFilling").value] || CONFIG.fillings[0]; }
+
+/* ========== FEATURE: панель владельца ========== */
+function checkHash(){
+  const admin = location.hash === "#admin";
+  document.getElementById("clientPage").classList.toggle("hidden", admin);
+  document.getElementById("adminPage").classList.toggle("hidden", !admin);
+}
+window.addEventListener("hashchange", checkHash);
+document.getElementById("exitAdmin").onclick = e => { e.preventDefault(); location.hash = ""; };
+document.getElementById("loginBtn").onclick = async () => {
+  const pass = document.getElementById("adminPass").value;
+  const {data, error} = await sb.rpc("check_site_password", {p_site_id: SITE_ID, p_pass: pass});
+  if (!error && data === true) {
+    sessionPass = pass;
+    document.getElementById("adminLogin").classList.add("hidden");
+    document.getElementById("adminPanel").classList.remove("hidden");
+    fillSettings(); loadOrders(); renderShopAdmin(); switchCakeTab(localStorage.getItem("cakeTab") || "basic");
+  } else document.getElementById("loginErr").textContent = "Неверный пароль";
+};
+function fillSettings(){
+  document.getElementById("sSlots").value = CONFIG.slotsPerDay;
+  document.getElementById("sHorizon").value = CONFIG.horizonDays;
+  document.getElementById("sBlocked").value = (CONFIG.blockedDates || []).join(", ");
+  document.getElementById("sDows").innerHTML = [1,2,3,4,5,6,0].map(i =>
+    `<span class="chip ${(CONFIG.weekdaysOff||[]).includes(i)?"on":""}" data-dow="${i}">${DOW[i]}</span>`).join("");
+  document.querySelectorAll("#sDows .chip").forEach(ch => ch.onclick = () => {
+    const d = +ch.dataset.dow;
+    CONFIG.weekdaysOff = (CONFIG.weekdaysOff||[]).includes(d) ? CONFIG.weekdaysOff.filter(x=>x!==d) : [...(CONFIG.weekdaysOff||[]), d];
+    ch.classList.toggle("on");
+  });
+}
+document.getElementById("saveSettings").onclick = async () => {
+  CONFIG.slotsPerDay = Math.max(1, +document.getElementById("sSlots").value || 3);
+  CONFIG.horizonDays = Math.max(1, +document.getElementById("sHorizon").value || 30);
+  CONFIG.blockedDates = document.getElementById("sBlocked").value.split(/[,;\s]+/).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s));
+  const ok = await saveConfig();
+  const el = document.getElementById("setSaved");
+  el.textContent = ok ? "Сохранено ✓" : "Ошибка сохранения";
+  setTimeout(()=>el.textContent="", 2000);
+  loadCounts().then(renderCalendar);
+};
+async function loadOrders(){
+  const box = document.getElementById("ordersBox");
+  const {data, error} = await sb.rpc("list_bookings", {p_site_id: SITE_ID, p_pass: sessionPass});
+  if (error) { box.textContent = "Ошибка: " + error.message; return; }
+  if (!data || !data.length) { box.innerHTML = `<p style="color:var(--text2);font-size:14px">Заказов пока нет</p>`; return; }
+  const today = iso(new Date());
+  box.innerHTML = data.slice().reverse().map(o => {
+    const archived = o.day < today;
+    return `<div class="order-row" style="${archived?"opacity:.55":""}">
+      <b>${o.day.split("-").reverse().join(".")}</b> · ${esc(o.product_name)}, ${o.weight} кг · ${esc(o.filling_name)}
+      ${o.options && o.options.length ? "· " + esc(o.options.join(", ")) : ""} · <b>${fmt(+o.total)}</b><br>
+      <span class="mut">${esc(o.client_name)} · ${esc(o.client_phone)}${o.comment ? " · " + esc(o.comment) : ""}${archived ? " · архив" : ""}</span><br>
+      <span class="badge ${o.status==="new"?"new":""}">${o.status==="new"?"новый":"подтверждён"}</span>
+      ${!archived ? `<span style="float:right">
+        ${o.status==="new"?`<button class="btn-s" onclick="confirmOrder(${o.id})">Подтвердить</button>`:""}
+        <button class="btn-d" onclick="deleteOrder(${o.id})">Удалить</button></span>` : ""}
+    </div>`;
+  }).join("");
+}
+window.confirmOrder = async id => { await sb.rpc("set_booking_status", {p_site_id: SITE_ID, p_id: id, p_status: "confirmed", p_pass: sessionPass}); loadOrders(); };
+window.deleteOrder = async id => { if (!confirm("Удалить заказ? Слот дня освободится.")) return; await sb.rpc("delete_booking", {p_site_id: SITE_ID, p_id: id, p_pass: sessionPass}); loadOrders(); loadCounts().then(renderCalendar); };
+/* ========== FEATURE: админ-CRUD витрины ========== */
+let prodEditIndex = -1, fillEditIndex = -1, optEditIndex = -1;
+function renderShopAdmin(){
+  const catBox = document.getElementById("aCatList"); catBox.innerHTML = "";
+  (CONFIG.categories || []).forEach((c, i) => {
+    const s = document.createElement("span"); s.className = "tag-chip";
+    s.innerHTML = `${esc(c)} <button title="Удалить">✕</button>`;
+    s.querySelector("button").onclick = () => { if (!confirm(`Удалить категорию «${c}»?`)) return; CONFIG.categories.splice(i, 1); saveConfig(); renderShopAdmin(); renderShop(); };
+    catBox.appendChild(s);
+  });
+  const pBox = document.getElementById("aProdList"); pBox.innerHTML = "";
+  pBox.innerHTML = `<div class="adm-head"><div>Фото</div><div>Название</div><div>Категория</div><div>₽/кг</div><div>Вес</div><div style="text-align:right">Порядок</div><div></div></div>`;
+  (CONFIG.products || []).forEach((p, i) => {
+    const d = document.createElement("div"); d.className = "adm-row";
+    d.innerHTML = `<div class="adm-thumb">${p.photo ? `<img src="${esc(p.photo)}" alt="">` : "🍰"}</div>
+      <div style="font-size:14px;font-weight:500">${esc(p.name)}</div>
+      <div style="font-size:13px;color:var(--text2)">${esc(p.category || "—")}</div>
+      <div style="font-size:13px">${fmt(p.pricePerKg)}/кг</div>
+      <div style="font-size:13px;color:var(--text2)">${p.minWeight}–${p.maxWeight} кг</div>
+      <div style="display:flex;gap:4px;justify-content:flex-end">
+        <button class="btn-s" style="padding:2px 8px" onclick="event.stopPropagation();moveProd(${i},-1)" ${i === 0 ? "disabled" : ""}>↑</button>
+        <button class="btn-s" style="padding:2px 8px" onclick="event.stopPropagation();moveProd(${i},1)" ${i === CONFIG.products.length - 1 ? "disabled" : ""}>↓</button>
+      </div>
+      <div style="text-align:right"><button class="btn-d" style="padding:2px 8px" onclick="event.stopPropagation();delProd(${i})">✕</button></div>`;
+    d.onclick = () => editProd(i);
+    pBox.appendChild(d);
+  });
+  if (!(CONFIG.products || []).length) pBox.innerHTML = `<p style="color:var(--text2);font-size:14px">Изделий пока нет</p>`;
+  const fBox = document.getElementById("aFillList"); fBox.innerHTML = "";
+  (CONFIG.fillings || []).forEach((f, i) => {
+    const d = document.createElement("div"); d.className = "order-row";
+    d.innerHTML = `<b>${esc(f.name)}</b> · +${fmt(f.pricePerKg)}/кг<span style="float:right"><button class="btn-s" onclick="editFilling(${i})">✎</button> <button class="btn-d" onclick="delFilling(${i})">✕</button></span>`;
+    fBox.appendChild(d);
+  });
+  const oBox = document.getElementById("aOptList"); oBox.innerHTML = "";
+  (CONFIG.options || []).forEach((o, i) => {
+    const d = document.createElement("div"); d.className = "order-row";
+    d.innerHTML = `<b>${esc(o.name)}</b> · ${fmt(o.price)}<span style="float:right"><button class="btn-s" onclick="editOpt(${i})">✎</button> <button class="btn-d" onclick="delOpt(${i})">✕</button></span>`;
+    oBox.appendChild(d);
+  });
+  document.getElementById("pCat").innerHTML = (CONFIG.categories || []).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+}
+document.getElementById("aCatAdd").onclick = () => {
+  const inp = document.getElementById("aCatNew"); const v = inp.value.trim();
+  if (!v) return;
+  CONFIG.categories = CONFIG.categories || [];
+  if (CONFIG.categories.includes(v)) { alert("Такая категория уже есть"); return; }
+  CONFIG.categories.push(v); inp.value = "";
+  saveConfig(); renderShopAdmin(); renderShop();
+};
+function switchCakeTab(name){
+  localStorage.setItem("cakeTab", name);
+  document.querySelectorAll("#adminTabs .chip").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  document.querySelectorAll("#adminPanel > [data-tab]").forEach(el => el.classList.toggle("hidden", el.dataset.tab !== name));
+}
+window.moveProd = (i, dir) => {
+  const j = i + dir;
+  if (j < 0 || j >= CONFIG.products.length) return;
+  const t = CONFIG.products[i]; CONFIG.products[i] = CONFIG.products[j]; CONFIG.products[j] = t;
+  saveConfig(); renderShopAdmin(); renderShop();
+};
+function resetProdForm(){
+  prodEditIndex = -1;
+  document.getElementById("aProdFormTitle").textContent = "Новое изделие";
+  ["pName","pPhoto","pDesc"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("pPrice").value = 1500;
+  document.getElementById("pMin").value = 1;
+  document.getElementById("pMax").value = 3;
+  document.getElementById("pCancel").classList.add("hidden");
+}
+window.editProd = i => {
+  prodEditIndex = i; const p = CONFIG.products[i];
+  document.getElementById("aProdFormTitle").textContent = "Редактирование: " + p.name;
+  document.getElementById("pName").value = p.name;
+  document.getElementById("pCat").value = p.category || "";
+  document.getElementById("pPhoto").value = p.photo || "";
+  document.getElementById("pDesc").value = p.description || "";
+  document.getElementById("pPrice").value = p.pricePerKg;
+  document.getElementById("pMin").value = p.minWeight;
+  document.getElementById("pMax").value = p.maxWeight;
+  document.getElementById("pCancel").classList.remove("hidden");
+};
+window.delProd = i => { if (!confirm(`Удалить изделие «${CONFIG.products[i].name}»?`)) return; CONFIG.products.splice(i, 1); saveConfig(); renderShopAdmin(); renderShop(); };
+document.getElementById("pSave").onclick = () => {
+  const name = document.getElementById("pName").value.trim();
+  const price = +document.getElementById("pPrice").value || 0;
+  const minW = +document.getElementById("pMin").value || 1;
+  const maxW = Math.max(minW, +document.getElementById("pMax").value || minW);
+  if (!name || price <= 0) { alert("Название и цена за кг обязательны"); return; }
+  const item = { name, category: document.getElementById("pCat").value, photo: document.getElementById("pPhoto").value.trim(), description: document.getElementById("pDesc").value.trim(), pricePerKg: price, minWeight: minW, maxWeight: maxW };
+  if (prodEditIndex >= 0) CONFIG.products[prodEditIndex] = item; else (CONFIG.products = CONFIG.products || []).push(item);
+  resetProdForm(); saveConfig(); renderShopAdmin(); renderShop();
+};
+document.getElementById("pCancel").onclick = resetProdForm;
+function resetFillForm(){ fillEditIndex = -1; document.getElementById("aFillFormTitle").textContent = "Новая начинка"; ["flName","flDesc"].forEach(id => document.getElementById(id).value = ""); document.getElementById("flPrice").value = 300; document.getElementById("flCancel").classList.add("hidden"); }
+window.editFilling = i => { fillEditIndex = i; const f = CONFIG.fillings[i]; document.getElementById("aFillFormTitle").textContent = "Редактирование: " + f.name; document.getElementById("flName").value = f.name; document.getElementById("flPrice").value = f.pricePerKg; document.getElementById("flDesc").value = f.description || ""; document.getElementById("flCancel").classList.remove("hidden"); };
+window.delFilling = i => { if (!confirm(`Удалить начинку «${CONFIG.fillings[i].name}»?`)) return; CONFIG.fillings.splice(i, 1); saveConfig(); renderShopAdmin(); };
+document.getElementById("flSave").onclick = () => {
+  const name = document.getElementById("flName").value.trim(); const price = +document.getElementById("flPrice").value || 0;
+  if (!name || price < 0) { alert("Название и цена обязательны"); return; }
+  const item = { name, pricePerKg: price, description: document.getElementById("flDesc").value.trim() };
+  if (fillEditIndex >= 0) CONFIG.fillings[fillEditIndex] = item; else (CONFIG.fillings = CONFIG.fillings || []).push(item);
+  resetFillForm(); saveConfig(); renderShopAdmin();
+};
+document.getElementById("flCancel").onclick = resetFillForm;
+function resetOptForm(){ optEditIndex = -1; document.getElementById("aOptFormTitle").textContent = "Новая опция"; document.getElementById("opName").value = ""; document.getElementById("opPrice").value = 300; document.getElementById("opCancel").classList.add("hidden"); }
+window.editOpt = i => { optEditIndex = i; const o = CONFIG.options[i]; document.getElementById("aOptFormTitle").textContent = "Редактирование: " + o.name; document.getElementById("opName").value = o.name; document.getElementById("opPrice").value = o.price; document.getElementById("opCancel").classList.remove("hidden"); };
+window.delOpt = i => { if (!confirm(`Удалить опцию «${CONFIG.options[i].name}»?`)) return; CONFIG.options.splice(i, 1); saveConfig(); renderShopAdmin(); };
+document.getElementById("opSave").onclick = () => {
+  const name = document.getElementById("opName").value.trim(); const price = +document.getElementById("opPrice").value || 0;
+  if (!name) { alert("Укажите название"); return; }
+  const item = { name, price };
+  if (optEditIndex >= 0) CONFIG.options[optEditIndex] = item; else (CONFIG.options = CONFIG.options || []).push(item);
+  resetOptForm(); saveConfig(); renderShopAdmin();
+};
+
+/* ========== CORE: Telegram WebApp (задел) ========== */
+if (window.Telegram && Telegram.WebApp) {
+  Telegram.WebApp.setHeaderColor("#1C1E21");
+  Telegram.WebApp.setBackgroundColor("#1C1E21");
+  Telegram.WebApp.ready();
+  Telegram.WebApp.expand();
+  const u = Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user;
+  if (u && u.first_name && !document.getElementById("fName").value) document.getElementById("fName").value = u.first_name + (u.last_name ? " " + u.last_name : "");
+  if (u && CONFIG.ownerIds && CONFIG.ownerIds.includes(u.id)) window.__tgOwner = u.id; // задел для беспарольного входа
+}
+/* ========== START ========== */
+(async () => {
+  CONFIG = await loadConfig();
+  const now = new Date(); viewY = now.getFullYear(); viewM = now.getMonth();
+  await loadCounts(); renderCalendar(); renderShop(); checkHash();
+})();
+</script>
+</body>
+</html>
