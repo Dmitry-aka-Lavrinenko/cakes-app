@@ -478,31 +478,41 @@ document.getElementById("submitBtn").onclick = async () => {
   const opts = [...document.querySelectorAll("#fOptions .chip")].filter(ch=>ch.querySelector("input").checked).map(ch=>CONFIG.options[+ch.dataset.i].name);
   const total = (p.pricePerKg + f.pricePerKg) * w + opts.reduce((s,n)=>s+(CONFIG.options.find(o=>o.name===n)||{price:0}).price,0);
   const btn = document.getElementById("submitBtn"); btn.disabled = true; st.textContent = "Бронируем...";
-  const {data: rid, error} = await sb.rpc("create_booking", {
-    p_site_id: SITE_ID, p_day: selDate, p_product_name: p.name, p_weight: w,
-    p_filling_name: f.name, p_options: opts, p_total: total,
-    p_client_name: name, p_client_phone: phone, p_comment: document.getElementById("fComment").value.trim()
-  });
-  btn.disabled = false;
-  if (error) { st.className="status err"; st.textContent="Ошибка связи: "+error.message; return; }
-  if (rid === -1) { st.className="status err"; st.textContent="Слишком много заявок с этого номера, подождите"; return; }
-  if (rid === -2) {
-    await loadCounts(); renderCalendar();
-    st.className="status err"; st.textContent="Окно только что заняли или день закрыт — выберите другую дату";
-    return;
+  try {
+    const {data: rid, error} = await sb.rpc("create_booking", {
+      p_site_id: SITE_ID, p_day: selDate, p_product_name: p.name, p_weight: w,
+      p_filling_name: f.name, p_options: opts, p_total: total,
+      p_client_name: name, p_client_phone: phone, p_comment: document.getElementById("fComment").value.trim()
+    });
+    if (error) throw new Error("create_booking: " + error.message);
+    if (rid === -1) { st.className = "status err"; st.textContent = "Слишком много заявок с этого номера, подождите"; return; }
+    if (rid === -2) {
+      await loadCounts(); renderCalendar();
+      st.className = "status err"; st.textContent = "Окно только что заняли или день закрыт — выберите другую дату";
+      return;
+    }
+    if (CONFIG.telegramConfigured && sb) {
+      try {
+        const tg = await sb.rpc("send_telegram_message", {p_site_id: SITE_ID, p_text:
+          "🎂 НОВАЯ БРОНЬ\nДата: " + selDate.split("-").reverse().join(".") +
+          "\nИзделие: " + p.name + ", " + w + " кг\nНачинка: " + f.name +
+          (opts.length ? "\nОпции: " + opts.join(", ") : "") +
+          "\nИтого: " + fmt(total) + "\nКлиент: " + name + ", " + phone +
+          (document.getElementById("fComment").value.trim() ? "\nКомментарий: " + document.getElementById("fComment").value.trim() : "")
+        });
+        if (tg.error) console.warn("telegram:", tg.error.message);
+      } catch (e) { console.warn("telegram:", e); }
+    }
+    await loadCounts(); selDate = null; renderCalendar();
+    document.getElementById("paramsBox").classList.add("hidden");
+    st.className = "status okc"; st.textContent = "Бронь отправлена! Кондитер подтвердит её в ближайшее время.";
+  } catch (e) {
+    console.error(e);
+    st.className = "status err";
+    st.textContent = "Ошибка отправки: " + (e && e.message ? e.message : "сеть недоступна") + ". Бронь могла не создаться — проверьте и повторите.";
+  } finally {
+    btn.disabled = false;
   }
-  if (CONFIG.telegramConfigured && sb) {
-    sb.rpc("send_telegram_message", {p_site_id: SITE_ID, p_text:
-      "🎂 НОВАЯ БРОНЬ\nДата: " + selDate.split("-").reverse().join(".") +
-      "\nИзделие: " + p.name + ", " + w + " кг\nНачинка: " + f.name +
-      (opts.length ? "\nОпции: " + opts.join(", ") : "") +
-      "\nИтого: " + fmt(total) + "\nКлиент: " + name + ", " + phone +
-      (document.getElementById("fComment").value.trim() ? "\nКомментарий: " + document.getElementById("fComment").value.trim() : "")
-    }).catch(()=>{});
-  }
-  await loadCounts(); selDate = null; renderCalendar();
-  document.getElementById("paramsBox").classList.add("hidden");
-  st.className = "status okc"; st.textContent = "Бронь отправлена! Кондитер подтвердит её в ближайшее время.";
 };
 function curFillingForSubmit(){ return CONFIG.fillings[+document.getElementById("fFilling").value] || CONFIG.fillings[0]; }
 
